@@ -9,7 +9,6 @@ package zeroconf
 
 import (
 	"context"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -43,7 +42,6 @@ type zeroconfRegistry struct {
 func (z *zeroconfRegistry) Register(service *registry.Service, opts ...registry.RegisterOption) error {
 	z.Lock()
 	defer z.Unlock()
-	log.Printf("in register, service = %+v\n", service)
 
 	var reserr error
 
@@ -52,7 +50,6 @@ func (z *zeroconfRegistry) Register(service *registry.Service, opts ...registry.
 	for _, node := range service.Nodes {
 		h, err := hash.Hash(node, nil)
 		if err != nil {
-			log.Printf("failed getting hash for node, err = %+v\n", err)
 			reserr = err
 			continue
 		}
@@ -69,15 +66,12 @@ func (z *zeroconfRegistry) Register(service *registry.Service, opts ...registry.
 
 		if seen && e.hash == h {
 			// already registered
-			log.Println("hash and entry already seen, continuing")
 			continue
 		} else if seen {
 			// hash didn't match!
-			log.Println("hash not matched, shutting down")
 			e.node.Shutdown()
 		} else {
 			// wasn't found, new entry
-			log.Println("new entry")
 			e = &zeroconfEntry{hash: h}
 		}
 
@@ -88,16 +82,14 @@ func (z *zeroconfRegistry) Register(service *registry.Service, opts ...registry.
 			Metadata:  node.Metadata,
 		})
 		if err != nil {
-			log.Printf("err encoding, %+v\n", err)
 			reserr = err
 			continue
 		}
 
 		// made it all the way through, register the new node
-		log.Printf("about to register, node.Id(%v) service.Name(%v) node.Port(%v) txt(%v)\n", node.Id, service.Name, node.Port, txt)
+		// TODO: move to registerproxy(?) to allow node.Address to be passed in
 		srv, err := zeroconf.Register(node.Id, service.Name, "local.", node.Port, txt, nil)
 		if err != nil {
-			log.Printf("failed registering, err = %+v\n", err)
 			reserr = err
 			continue
 		}
@@ -108,8 +100,6 @@ func (z *zeroconfRegistry) Register(service *registry.Service, opts ...registry.
 	}
 
 	z.services[service.Name] = entries
-
-	log.Printf("z.services[service.Name] = %+v\n", entries)
 
 	return reserr
 }
@@ -140,7 +130,6 @@ func (z *zeroconfRegistry) Deregister(service *registry.Service) error {
 }
 
 func (z *zeroconfRegistry) GetService(service string) ([]*registry.Service, error) {
-	log.Printf("in GetService(%v)\n", service)
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		return nil, err
@@ -151,15 +140,12 @@ func (z *zeroconfRegistry) GetService(service string) ([]*registry.Service, erro
 
 	go func(results <-chan *zeroconf.ServiceEntry) {
 		for e := range results {
-			log.Printf("e = %+v\n", e)
 			if e.TTL == 0 {
-				log.Println("skipping for 0 ttl")
 				continue
 			}
 
 			txt, err := decode(e.Text)
 			if err != nil || txt.Service != service || len(e.AddrIPv4) == 0 {
-				log.Printf("skipping after decoding, e = %+v, txt = %+v\n", e, txt)
 				continue
 			}
 
@@ -183,15 +169,12 @@ func (z *zeroconfRegistry) GetService(service string) ([]*registry.Service, erro
 		}
 	}(entries)
 
-	log.Printf("setting timeout(%+v)\n", z.opts.Timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), z.opts.Timeout)
 	defer cancel()
 	err = resolver.Browse(ctx, service, "local.", entries)
 	if err != nil {
-		log.Printf("err during browse, err = %+v\n", err)
 		return nil, err
 	}
-	log.Printf("browse complete\n")
 
 	<-ctx.Done()
 
