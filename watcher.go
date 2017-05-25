@@ -43,7 +43,8 @@ func (z *zeroconfWatcher) Next() (*registry.Result, error) {
 			}
 
 			// TODO: don't hardcode .local.
-			if !strings.HasSuffix(e.Instance, "."+service.Name+".local.") {
+			zn := CleanServiceName(service.Name) + ".local."
+			if !strings.HasSuffix(e.Instance, zn) {
 				continue
 			}
 
