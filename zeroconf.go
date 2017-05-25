@@ -9,6 +9,7 @@ package zeroconf
 
 import (
 	"context"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -88,7 +89,10 @@ func (z *zeroconfRegistry) Register(service *registry.Service, opts ...registry.
 
 		// made it all the way through, register the new node
 		// TODO: move to registerproxy(?) to allow node.Address to be passed in
-		srv, err := zeroconf.Register(node.Id, service.Name, "local.", node.Port, txt, nil)
+		// TODO: alter the service.Name to select just one piece, end with ._tcp and add _ to the
+		// beginning if not already present
+		zn := CleanServiceName(service.Name)
+		srv, err := zeroconf.Register(node.Id, zn, "local.", node.Port, txt, nil)
 		if err != nil {
 			reserr = err
 			continue
@@ -130,7 +134,8 @@ func (z *zeroconfRegistry) Deregister(service *registry.Service) error {
 }
 
 func (z *zeroconfRegistry) GetService(service string) ([]*registry.Service, error) {
-	resolver, err := zeroconf.NewResolver(nil)
+	log.Printf("getting a single service")
+	resolver, err := zeroconf.NewResolver(zeroconf.SelectIPTraffic(zeroconf.IPv4))
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +176,7 @@ func (z *zeroconfRegistry) GetService(service string) ([]*registry.Service, erro
 
 	ctx, cancel := context.WithTimeout(context.Background(), z.opts.Timeout)
 	defer cancel()
-	err = resolver.Browse(ctx, service, "local.", entries)
+	err = resolver.Browse(ctx, CleanServiceName(service), "local.", entries)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +192,8 @@ func (z *zeroconfRegistry) GetService(service string) ([]*registry.Service, erro
 }
 
 func (z *zeroconfRegistry) ListServices() ([]*registry.Service, error) {
-	resolver, err := zeroconf.NewResolver(nil)
+	log.Printf("listing services!")
+	resolver, err := zeroconf.NewResolver(zeroconf.SelectIPTraffic(zeroconf.IPv4))
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +229,7 @@ func (z *zeroconfRegistry) ListServices() ([]*registry.Service, error) {
 }
 
 func (z *zeroconfRegistry) Watch() (registry.Watcher, error) {
-	resolver, err := zeroconf.NewResolver(nil)
+	resolver, err := zeroconf.NewResolver(zeroconf.SelectIPTraffic(zeroconf.IPv4))
 	if err != nil {
 		return nil, err
 	}

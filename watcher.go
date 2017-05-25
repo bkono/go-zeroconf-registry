@@ -3,6 +3,7 @@ package zeroconf
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"github.com/bkono/zeroconf"
@@ -42,8 +43,11 @@ func (z *zeroconfWatcher) Next() (*registry.Result, error) {
 				Endpoints: txt.Endpoints,
 			}
 
+			log.Printf("ZEROCONF: evaluating instance(%s) for service.Name match: \n", e.Instance)
+
 			// TODO: don't hardcode .local.
-			if !strings.HasSuffix(e.Instance, "."+service.Name+".local.") {
+			zn := CleanServiceName(service.Name) + ".local."
+			if !strings.HasSuffix(e.Instance, zn) {
 				continue
 			}
 
